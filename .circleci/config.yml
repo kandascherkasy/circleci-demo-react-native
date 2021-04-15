@@ -1,88 +1,107 @@
+---
+
 version: 2.1
-jobs:
-  node:
-    working_directory: ~/demo-react-native
+
+orbs:
+  ruby: circleci/ruby@1.1.2 # https://circleci.com/developer/orbs/orb/circleci/ruby
+  node: circleci/node@4.2.1 # https://circleci.com/developer/orbs/orb/circleci/node
+
+# executors description
+executors:
+  docker_node:
     docker:
-      - image: cimg/node:lts
+      - image: "circleci/node:lts"
+    resource_class: small
+    working_directory: ~/demo-react-native
+    environment:
+      JEST_JUNIT_OUTPUT: test-results/jest/junit.xml
+  # docker_android:
+  #   docker:
+  #     - image: circleci/android:api-29-node
+  #   resource_class: large
+  #   working_directory: ~/demo-react-native/android
+  #   environment:
+  #     # fastlane
+  #     FASTLANE_SKIP_UPDATE_CHECK: true
+  #     FASTLANE_HIDE_CHANGELOG: true
+  #     TERM: xterm-256color
+  #     # java; gradle
+  #     _JAVA_OPTIONS: >-
+  #       -XX:+HeapDumpOnOutOfMemoryError
+  #       -Xmx8192m
+  #       -Dfile.encoding=UTF-8
+  #     GRADLE_OPTS: >-
+  #       -Dorg.gradle.daemon=false
+  #       -Dorg.gradle.parallel=true
+  #       -Dorg.gradle.workers.max=4
+
+jobs:
+  unit_tests:
+    executor: docker_node
 
     steps:
+      ### manage deps
       - checkout
+      - node/install-packages:
+          # not standart cmd example
+          override-ci-command: >-
+            yarn
+            --no-progress
+            --frozen-lockfile
+            --cache-folder /tmp/cache/yarn
+          pkg-manager: 'yarn' # not standart package manager example
 
-      - restore_cache:
-          key: yarn-v1-{{ checksum "yarn.lock" }}-{{ arch }}
-
-      - restore_cache:
-          key: node-v1-{{ checksum "package.json" }}-{{ arch }}
-
-      - run: yarn install
-
-      - save_cache:
-          key: yarn-v1-{{ checksum "yarn.lock" }}-{{ arch }}
-          paths:
-            - ~/.cache/yarn
-
-      - save_cache:
-          key: node-v1-{{ checksum "package.json" }}-{{ arch }}
-          paths:
-            - node_modules
-
+      ### tests
       - run:
-          name: jest tests
+          name: run unit-tests
           command: |
             mkdir -p test-results/jest
             yarn run test
-          environment:
-            JEST_JUNIT_OUTPUT: test-results/jest/junit.xml
 
-      - persist_to_workspace:
-          root: ~/demo-react-native
-          paths:
-            - node_modules
-
+      ### job artifacts
       - store_test_results:
           path: test-results
-
       - store_artifacts:
           path: test-results
 
-  android-build-and-test:
-    working_directory: ~/demo-react-native/android
-    docker:
-      - image: circleci/android:api-29-node
-    steps:
-      - checkout:
-          path: ~/demo-react-native
-
-      - attach_workspace:
-          at: ~/demo-react-native
-
-      - restore_cache:
-          key: bundle-v1-{{ checksum "Gemfile.lock" }}-{{ arch }}
-
-      - run: bundle install
-
-      - save_cache:
-          key: bundle-v1-{{ checksum "Gemfile.lock" }}-{{ arch }}
-          paths:
-            - vendor/bundle
-
-      - run:
-          name: fastlane tests
-          command: |
-            mkdir -p test-results/fastlane
-            bundle exec fastlane test
-            mv fastlane/report.xml test-results/fastlane
-
-      - store_test_results:
-          path: test-results
-
-      - store_artifacts:
-          path: test-results
+  # android-build-and-test:
+  #   executor: docker_android
+  #
+  #   steps:
+  #     - checkout:
+  #         path: ~/demo-react-native
+  #
+  #     - attach_workspace:
+  #         at: ~/demo-react-native
+  #
+  #     - restore_cache:
+  #         key: bundle-v1-{{ checksum "Gemfile.lock" }}-{{ arch }}
+  #
+  #     - run: bundle install
+  #
+  #     - save_cache:
+  #         key: bundle-v1-{{ checksum "Gemfile.lock" }}-{{ arch }}
+  #         paths:
+  #           - vendor/bundle
+  #
+  #     - run:
+  #         name: fastlane tests
+  #         command: |
+  #           mkdir -p test-results/fastlane
+  #           bundle exec fastlane test
+  #           mv fastlane/report.xml test-results/fastlane
+  #
+  #     - store_test_results:
+  #         path: test-results
+  #
+  #     - store_artifacts:
+  #         path: test-results
 
 workflows:
-  node-android-ios:
+  node-android:
     jobs:
-      - node
-      - android-build-and-test:
-          requires:
-            - node
+      - unit_tests
+      # - android-build-and-test:
+      #     requires:
+      #       - node
+...
