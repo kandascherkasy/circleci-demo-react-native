@@ -78,6 +78,7 @@ jobs:
       - attach_workspace:
           at: ~/demo-react-native
       ## no need to install node modules, cause it comes from prev step via attached workspace
+      - ruby/install-deps
 
       # run tests
       - run:
