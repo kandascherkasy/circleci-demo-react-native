@@ -15,29 +15,11 @@ executors:
     working_directory: ~/demo-react-native
     environment:
       JEST_JUNIT_OUTPUT: test-results/jest/junit.xml
-  docker_android:
-    docker:
-      - image: circleci/android:api-29-node
-    resource_class: large
-    working_directory: ~/demo-react-native/android
-    environment:
-      # fastlane
-      FASTLANE_SKIP_UPDATE_CHECK: true
-      FASTLANE_HIDE_CHANGELOG: true
-      TERM: xterm-256color
-      # java; gradle
-      _JAVA_OPTIONS: >-
-        -XX:+HeapDumpOnOutOfMemoryError
-        -Xmx8192m
-        -Dfile.encoding=UTF-8
-      GRADLE_OPTS: >-
-        -Dorg.gradle.daemon=false
-        -Dorg.gradle.parallel=true
-        -Dorg.gradle.workers.max=4
 
 jobs:
   unit_tests:
     executor: docker_node
+    parallelism: 4
 
     steps:
       ### manage deps
@@ -60,33 +42,10 @@ jobs:
           name: run unit-tests
           command: |
             mkdir -p test-results/jest
-            yarn run test
+            TEST=$(circleci tests glob **/__tests__/*.js | circleci tests split --split-by=timings)
+            yarn test $TEST
 
       ### job artifacts
-      - store_test_results:
-          path: test-results
-      - store_artifacts:
-          path: test-results
-
-  android-build-and-test:
-    executor: docker_android
-
-    steps:
-      # install deps
-      - checkout:
-          path: ~/demo-react-native
-      - attach_workspace:
-          at: ~/demo-react-native
-      ## no need to install node modules, cause it comes from prev step via attached workspace
-      - ruby/install-deps
-
-      # run tests
-      - run:
-          name: fastlane tests
-          command: |
-            mkdir -p test-results/fastlane
-            bundle exec fastlane test
-            mv fastlane/report.xml test-results/fastlane
       - store_test_results:
           path: test-results
       - store_artifacts:
@@ -96,8 +55,5 @@ workflows:
   node-android:
     jobs:
       - unit_tests
-      - android-build-and-test:
-          requires:
-            - unit_tests
 
 ...
